@@ -271,6 +271,85 @@ main::after {
 ```
 #### 扩展
   > extend是Less的一个伪类，它会合并它所在的选择器和它所匹配的引用。
+```less
+/*    Less    */
+nav ul {
+  &:extend(.inline);           // “&”代表所有祖先元素
+  background: blue;
+}
+.inline {
+  color: red;
+}
+
+/* 编译后的css */
+nav ul {
+  background: blue;
+}
+.inline,
+nav ul {
+  color: red;
+}
+```  
+- 与混合的区别：**CSS尺寸归并**。Mixins会复制所有的属性到选择器中，这可能导致不必要的重复。而Extend是将要用的属性移过去，这样就会生成更少的CSS。
+```less
+/*    Less    */
+.sample() {
+  color: red;
+}
+.demo1 {
+  .sample;
+}
+.demo2 {
+  .sample;
+}
+
+/* （用Mixins）编译后的css */
+.demo1 {
+  color: red;
+},
+.demo2 {
+  color: red;
+}
+
+/* （用Extend）编译后的css */
+.demo1,
+.demo2 {
+  color: red;
+}
+```  
+- extend可以附加给一个选择器，也可以放入一个规则集中。
+```less
+// 下面两种写法等价
+.a:extend(.b) {}
+.a{
+  &:extend(.b);
+}
+```
+- 可以使用关键字all选择相邻的选择器。当在extend参数的最后面指定all关键字时，这个选择器会被复制，然后匹配的选择器部分会使用扩展替换，创建一个新的选择器。
+```less
+/*    Less    */
+.c.test,
+.test.d {
+  color: orange;
+}
+.replacement:extend(.test all) {}
+
+/* 编译后的css */
+.c.test,
+.test.d,
+.c.replacement,
+.replacement.d {
+  color: orange;
+}
+```
+- 允许有多个扩展
+```less
+// 下面两种写法等价
+.e:extend(.f, .g){}
+.e:extend(.f):extend(.g){}
+```
+- extend默认会在选择器之间寻找精确匹配。不管选择器是否以“*”开头，伪类的顺序是否相同，nth表达式是否具有相同的意义，它们必须以相同的形式匹配。唯一例外的是属性选择器内的引号。
+- 扩展必须放在最后。
 #### 嵌套规则  
   可以在一个选择器中嵌套另一个选择器来实现继承，这样很大程度减少了代码量，并且代码看起来更加的清晰。  
   备注：嵌套层数最好不超过三层，否则不利于代码维护。
@@ -314,56 +393,51 @@ main::after {
   width: 300px;
 }
 ```
-#### 继承
+#### 循环
+> 在Less中，混合可以调用它自身。这样，当一个混合递归调用自己，再结合Guard表达式和模式匹配这两个特性，就可以写出循环结构。
+经典用例就是生成栅格系统的CSS。
 ```less
 /*    Less    */
-#demo {
-  width: 200px;
-  &:after {
-    content: 'hello world'
+.generate-columns(@n, @i: 1) when (@i =< @n) {
+  .column-@{i} {
+    width: (@i * 100% / @n);                // 每次递归时产生的样式代码
   }
+  .generate-columns(@n, (@i + 1));          // 递归调用自身
 }
-#main {
-  &:extend(#demo);
-}
+.generate-columns(4);
 
 /* 编译后的css */
-#demo, #main {
-  width: 200px;
+.column-1 {
+  width: 25%;
 }
-#demo:after {
-  content: 'hello world';
+.column-2 {
+  width: 50%;
 }
-```
-  使用all 全局搜索替换：可继承选择器匹配到的全部声明中的样式。  
-```less
-/*    Less    */
-#demo {
-  width: 200px;
-  &:after {
-    content: 'hello world'
-  }
+.column-3 {
+  width: 75%;
 }
-#wrap:extend(#demo all) {}
-
-/* 编译后的css */
-#demo, #wrap {
-  width: 200px;
-}
-#demo:after, #wrap:after {
-  content: 'hello world';
+.column-4 {
+  width: 100%;
 }
 ```
-#### Importing  
+#### Importing 
+**1. 导入准则**
   - 引入less文件，.less后缀可带可不带。
   - 引入css文件且不想Less对它进行处理，只需要使用.css后缀就可以。  
   - @import的位置可随意放置。
-  - 使用@import (reference)导入外部文件，只引用，不编译。  
 ```html
 @import 'lib.less';
 @import 'lib';
 @import (reference) "bootstrap.less"; 
 ```
+**2. 导入选项**
+  语法：@import (keyword) "filename";
+  - reference：使用Less文件但不输出
+  - inline：在输出中包含源文件但不加工它
+  - less：将文件作为Less文件对象，无论是什么文件扩展名
+  - css：将文件作为CSS文件对象，无论是什么文件扩展名
+  - once：只包含文件一次（默认行为）
+  - multiple：包含文件多次
 #### 其他  
 **1. 注释**  
   - /**/ 编译
